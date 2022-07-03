@@ -31,7 +31,7 @@ void usb_testing()
 	{
 		uint8_t *usb_buf = calloc(data_length+1, sizeof(*usb_buf));
 		CDC_Read_FS(usb_buf, data_length);
-		CDC_Transmit_FS(usb_buf, strlen((const char*)usb_buf));
+		CDC_Transmit_FS(usb_buf, data_length);
 		free(usb_buf);
 	}
 }
