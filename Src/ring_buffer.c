@@ -23,7 +23,7 @@
 */
 #include "ring_buffer.h"
 
-bool lock;
+bool *lock;
 
 struct ring_buffer_t{
     size_t head;
@@ -50,65 +50,73 @@ rbuf_handle_t ring_buffer_init(size_t size)
 	buf->data = calloc(buf->buffer_size, sizeof(*buf->data));
 	buf->is_empty = true;
 	buf->is_full = false;
-	lock = false;
+
+	lock = malloc(sizeof(*lock));
+	if (lock == NULL)
+	{
+		free(buf->data);
+		free(buf);
+		return NULL;
+	}
+	*lock = false;
 	
 	return buf;
 }
 
 ring_buffer_SIG ring_buffer_flush(rbuf_handle_t handle)
 {
-	if (lock)
+	if (*lock)
 	{
 		return BUSY;
 	}
-	lock = true;
+	*lock = true;
 	if (handle == NULL)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 	handle->head = 0;
 	handle->tail = 0;
 	handle->is_empty = true;
 	handle->is_full = false;
-	lock = false;
+	*lock = false;
 	return OK;	
 }
 
 size_t ring_buffer_available_bytes(rbuf_handle_t handle)
 {
-	if (lock)
+	if (*lock)
 	{
 		return 0;
 	}
-	lock = true;
+	*lock = true;
 	if (handle == NULL)
 	{
-		lock = false;
+		*lock = false;
 		return 0;
 	}
 
 	if (handle->is_empty)
 	{
-		lock = false;
+		*lock = false;
 		return 0;
 	}
 	else if (handle->is_full)
 	{
-		lock = false;
+		*lock = false;
 		return (handle->buffer_size);
 	}
 	else if (handle->head > handle->tail)
 	{
 		size_t ret = (size_t)(handle->head - handle->tail);
-		lock = false;
+		*lock = false;
 		return ret;
 	}
 	else
 	{		
 		/*This case shouldn't happen normally since the tail should never exceed the head*/
 		size_t ret = (size_t)(handle->buffer_size + handle->head - handle->tail);
-		lock = false;
+		*lock = false;
 		return ret;
 	}
 }
@@ -116,20 +124,20 @@ size_t ring_buffer_available_bytes(rbuf_handle_t handle)
 
 ring_buffer_SIG ring_buffer_write(rbuf_handle_t handle, uint8_t* data, size_t size)
 {
-	if (lock)
+	if (*lock)
 	{
 		return BUSY;
 	}
-	lock = true;
+	*lock = true;
 	if (handle == NULL)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 	size_t buf_unused_space;
 	if (handle->is_full)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 	else if (handle->is_empty)
@@ -147,7 +155,7 @@ ring_buffer_SIG ring_buffer_write(rbuf_handle_t handle, uint8_t* data, size_t si
 
 	if (buf_unused_space < size)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 
@@ -161,26 +169,26 @@ ring_buffer_SIG ring_buffer_write(rbuf_handle_t handle, uint8_t* data, size_t si
 		handle->is_full = true;
 	}
 	handle->is_empty = false;
-	lock = false;
+	*lock = false;
 	return OK;
 }
 
 ring_buffer_SIG ring_buffer_read(rbuf_handle_t handle, uint8_t* data, size_t size)
 {
-	if (lock)
+	if (*lock)
 	{
 		return BUSY;
 	}
-	lock = true;
+	*lock = true;
 	if (handle == NULL)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 	size_t buf_size_used;
 	if (handle->is_empty)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 	else if (handle->is_full)
@@ -198,7 +206,7 @@ ring_buffer_SIG ring_buffer_read(rbuf_handle_t handle, uint8_t* data, size_t siz
 
 	if (buf_size_used > size)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 
@@ -214,25 +222,25 @@ ring_buffer_SIG ring_buffer_read(rbuf_handle_t handle, uint8_t* data, size_t siz
 		handle->is_empty = true;
 	}
 	handle->is_full = false;
-	lock = false;
+	*lock = false;
 	return OK;
 }
 
 
 ring_buffer_SIG ring_buffer_deinit(rbuf_handle_t handle)
 {
-	if (lock)
+	if (*lock)
 	{
 		return BUSY;
 	}
-	lock = true;
+	*lock = true;
 	if (handle == NULL)
 	{
-		lock = false;
+		*lock = false;
 		return FAIL;
 	}
 	free(handle->data);
 	free(handle);
-	lock = false;
+	free(lock);
 	return OK;
 }
